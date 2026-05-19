@@ -1,0 +1,31 @@
+name: Daily Taiwan Stock Screener
+
+on:
+  schedule:
+    # 每週一至五 09:30 UTC = 台灣時間 17:30
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch:  # 允許手動觸發
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install yfinance pandas numpy supabase requests python-dotenv
+
+      - name: Run screener
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scripts/screener.py
