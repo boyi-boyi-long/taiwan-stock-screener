@@ -9,10 +9,11 @@
     body { font-family: 'Courier New', monospace; }
     th { cursor: pointer; user-select: none; white-space: nowrap; }
     th:hover { color: #93c5fd; }
-    .sort-asc::after  { content: ' ↑'; color: #60a5fa; }
-    .sort-desc::after { content: ' ↓'; color: #60a5fa; }
-    .sort-none::after { content: ' ↕'; opacity: 0.3; }
-    tr:hover td { background-color: rgba(59,130,246,0.08); }
+    .sort-asc::after  { content: ' 🔼'; font-size: 0.75em; }
+    .sort-desc::after { content: ' 🔽'; font-size: 0.75em; }
+    .sort-none::after { content: ' ↕'; opacity: 0.25; font-size: 0.75em; }
+    tr:hover td { background-color: rgba(59,130,246,0.07); }
+    input[type=range] { accent-color: #3b82f6; cursor: pointer; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner { animation: spin 1s linear infinite; }
   </style>
@@ -21,18 +22,18 @@
 
 <div class="max-w-7xl mx-auto px-4 py-8">
 
-  <!-- Header -->
+  <!-- ── Header ── -->
   <div class="flex flex-wrap items-start justify-between gap-4 mb-8">
     <div>
       <h1 class="text-2xl font-bold text-blue-400 tracking-wide">台股選股系統</h1>
       <p class="text-gray-500 text-xs mt-1">每日 17:30 自動篩選高相對成交量 + 高波動度股票</p>
     </div>
     <div class="flex items-center gap-3">
-      <label class="text-gray-500 text-sm">日期篩選</label>
+      <label class="text-gray-500 text-sm">歷史日期</label>
       <select id="dateSelect"
         class="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-300
-               focus:outline-none focus:border-blue-500 transition-colors">
-        <option value="">全部日期</option>
+               focus:outline-none focus:border-blue-500 transition-colors min-w-[150px]">
+        <option value="">載入中…</option>
       </select>
       <button onclick="reload()"
         class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded transition-colors">
@@ -41,18 +42,18 @@
     </div>
   </div>
 
-  <!-- Condition cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+  <!-- ── Condition cards ── -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
     <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
-      <div class="text-xs text-gray-600 mb-1 uppercase tracking-wider">條件一</div>
+      <div class="text-xs text-gray-600 mb-1 uppercase tracking-wider">篩選條件一</div>
       <div class="text-sm">30日均量 <span class="text-emerald-400 font-bold">&gt; 100萬股</span></div>
     </div>
     <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
-      <div class="text-xs text-gray-600 mb-1 uppercase tracking-wider">條件二</div>
+      <div class="text-xs text-gray-600 mb-1 uppercase tracking-wider">篩選條件二</div>
       <div class="text-sm">相對成交量 <span class="text-emerald-400 font-bold">&gt; 1.5×</span></div>
     </div>
     <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
-      <div class="text-xs text-gray-600 mb-1 uppercase tracking-wider">條件三</div>
+      <div class="text-xs text-gray-600 mb-1 uppercase tracking-wider">篩選條件三</div>
       <div class="text-sm">
         ATR(14) <span class="text-emerald-400 font-bold">&gt; $2.5</span>
         <span class="text-gray-600 text-xs ml-1">（股價≥200元則&gt;$5）</span>
@@ -60,20 +61,53 @@
     </div>
   </div>
 
-  <!-- Stats bar -->
-  <div class="flex items-center gap-6 mb-3 text-sm text-gray-500">
-    <span id="resultCount">—</span>
-    <span id="loadStatus" class="text-blue-500"></span>
+  <!-- ── Filter bar ── -->
+  <div class="flex flex-wrap items-center gap-x-8 gap-y-3
+              bg-gray-900/70 border border-gray-800 rounded-lg px-5 py-3 mb-4">
+
+    <!-- Max close price -->
+    <div class="flex items-center gap-2">
+      <label class="text-gray-500 text-xs whitespace-nowrap">收盤價上限</label>
+      <input id="filterMaxClose" type="number" min="0" step="10" placeholder="不限"
+        class="w-24 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200
+               focus:outline-none focus:border-blue-500 placeholder-gray-700"
+        oninput="applyFilters()">
+      <span class="text-gray-600 text-xs">元</span>
+    </div>
+
+    <!-- Min relative volume slider -->
+    <div class="flex items-center gap-3 flex-1 min-w-[220px]">
+      <label class="text-gray-500 text-xs whitespace-nowrap">相對量下限</label>
+      <input id="filterMinRelVol" type="range" min="1.5" max="10" step="0.5" value="1.5"
+        class="flex-1 h-1"
+        oninput="document.getElementById('relVolVal').textContent = (+this.value).toFixed(1)+'×'; applyFilters()">
+      <span id="relVolVal" class="text-blue-400 text-xs font-mono w-10 text-right">1.5×</span>
+    </div>
+
+    <!-- Reset + status -->
+    <button onclick="resetFilters()"
+      class="text-xs text-gray-600 hover:text-gray-300 border border-gray-700 hover:border-gray-500
+             rounded px-2 py-1 transition-colors whitespace-nowrap">
+      重置過濾
+    </button>
+    <span id="filterStatus" class="text-xs text-yellow-600"></span>
   </div>
 
-  <!-- Table -->
+  <!-- ── Stats bar ── -->
+  <div class="flex items-center gap-6 mb-3 text-sm">
+    <span id="resultCount" class="text-gray-500">—</span>
+    <span id="dataDate"    class="text-gray-600 text-xs"></span>
+    <span id="loadStatus"  class="text-blue-500 text-xs"></span>
+  </div>
+
+  <!-- ── Table ── -->
   <div class="overflow-x-auto rounded-lg border border-gray-800">
     <table class="w-full text-sm border-collapse">
       <thead>
         <tr class="bg-gray-900 text-gray-400 text-xs uppercase tracking-wider">
-          <th class="text-left px-4 py-3 sort-none"  onclick="sortBy('date')">篩選日期</th>
-          <th class="text-left px-4 py-3 sort-none"  onclick="sortBy('symbol')">代碼</th>
-          <th class="text-left px-4 py-3 sort-none"  onclick="sortBy('name')">名稱</th>
+          <th class="text-left  px-4 py-3 sort-none" onclick="sortBy('date')">篩選日期</th>
+          <th class="text-left  px-4 py-3 sort-none" onclick="sortBy('symbol')">代碼</th>
+          <th class="text-left  px-4 py-3 sort-none" onclick="sortBy('name')">名稱</th>
           <th class="text-right px-4 py-3 sort-none" onclick="sortBy('close')">收盤價</th>
           <th class="text-right px-4 py-3 sort-none" onclick="sortBy('volume')">今日成交量</th>
           <th class="text-right px-4 py-3 sort-none" onclick="sortBy('avg_volume_30d')">30日均量</th>
@@ -88,7 +122,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
             </svg>
-            載入中...
+            載入中…
           </td>
         </tr>
       </tbody>
@@ -102,95 +136,157 @@
 </div>
 
 <script>
+  /* ════════════════════════════════════════
+     State
+  ════════════════════════════════════════ */
   const COLS = ['date','symbol','name','close','volume','avg_volume_30d','relative_volume','atr_14'];
-  let rows = [];
-  let sortKey = 'relative_volume';
-  let sortDir = 'desc';
+  let rows          = [];   // raw data from API (never mutated by filters)
+  let sortKey       = 'relative_volume';
+  let sortDir       = 'desc';
+  let filterMaxClose   = Infinity;
+  let filterMinRelVol  = 1.5;
 
-  /* ── 格式化 ── */
-  function fmtVol(n) {
-    return Number(n).toLocaleString('zh-TW');
-  }
-  function fmtPrice(n) { return '$' + Number(n).toFixed(2); }
-  function fmtRelVol(n) {
+  /* ════════════════════════════════════════
+     Formatters
+  ════════════════════════════════════════ */
+  const fmtVol    = n => Number(n).toLocaleString('zh-TW');
+  const fmtPrice  = n => '$' + Number(n).toFixed(2);
+  const fmtRelVol = n => {
     const v = Number(n);
     const cls = v >= 3 ? 'text-emerald-300 font-bold'
               : v >= 2 ? 'text-emerald-400'
                        : 'text-emerald-600';
     return `<span class="${cls}">${v.toFixed(2)}×</span>`;
-  }
+  };
 
-  const SPINNER = `
-    <svg class="spinner inline w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
-      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-    </svg>`;
+  const SPINNER = `<svg class="spinner inline w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+  </svg>`;
 
-  /* ── 日期下拉 ── */
+  /* ════════════════════════════════════════
+     Date selector
+  ════════════════════════════════════════ */
   async function loadDates() {
     try {
-      const r = await fetch('/api/dates');
-      const j = await r.json();
+      const j = await fetch('/api/dates').then(r => r.json());
       const sel = document.getElementById('dateSelect');
+      sel.innerHTML = '';
       (j.dates || []).forEach((d, i) => {
         const o = document.createElement('option');
         o.value = d;
-        o.textContent = d + (i === 0 ? '（最新）' : '');
+        o.textContent = d + (i === 0 ? '  ← 最新' : '');
         sel.appendChild(o);
       });
+      if (!j.dates?.length) {
+        sel.innerHTML = '<option value="">尚無資料</option>';
+      }
     } catch {
-      // date filter silently degraded — "全部日期" still works
+      document.getElementById('dateSelect').innerHTML = '<option value="">無法載入</option>';
     }
   }
 
-  /* ── 載入結果 ── */
-  async function loadResults(date = '') {
-    document.getElementById('loadStatus').textContent = '載入中...';
+  /* ════════════════════════════════════════
+     Load stocks from API
+  ════════════════════════════════════════ */
+  async function loadResults(date) {
+    document.getElementById('loadStatus').textContent = '載入中…';
     document.getElementById('tableBody').innerHTML =
-      `<tr><td colspan="8" class="text-center py-16 text-gray-600">${SPINNER}載入中...</td></tr>`;
+      `<tr><td colspan="8" class="text-center py-16 text-gray-600">${SPINNER}載入中…</td></tr>`;
 
     const url = date
-      ? `/api/results?date=${encodeURIComponent(date)}`
+      ? `/api/stocks?date=${encodeURIComponent(date)}`
       : '/api/stocks';
+
     try {
       const r = await fetch(url);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
+      if (j.error) throw new Error(j.error);
+
       rows = j.results || [];
-      document.getElementById('resultCount').textContent = `共 ${j.count ?? 0} 筆符合`;
+      document.getElementById('dataDate').textContent =
+        j.date ? `資料日期：${j.date}` : '';
       document.getElementById('loadStatus').textContent = '';
       renderTable();
     } catch (e) {
       document.getElementById('loadStatus').textContent = '載入失敗：' + e.message;
       document.getElementById('tableBody').innerHTML =
         `<tr><td colspan="8" class="text-center py-12 text-red-500">載入失敗：${e.message}</td></tr>`;
+      document.getElementById('resultCount').textContent = '—';
     }
   }
 
   function reload() {
-    loadResults(document.getElementById('dateSelect').value);
+    loadResults(document.getElementById('dateSelect').value || undefined);
   }
 
-  /* ── 渲染表格 ── */
+  /* ════════════════════════════════════════
+     Filters
+  ════════════════════════════════════════ */
+  function applyFilters() {
+    const raw = parseFloat(document.getElementById('filterMaxClose').value);
+    filterMaxClose  = (raw > 0) ? raw : Infinity;
+    filterMinRelVol = parseFloat(document.getElementById('filterMinRelVol').value) || 1.5;
+    renderTable();
+  }
+
+  function resetFilters() {
+    document.getElementById('filterMaxClose').value   = '';
+    document.getElementById('filterMinRelVol').value  = 1.5;
+    document.getElementById('relVolVal').textContent  = '1.5×';
+    filterMaxClose  = Infinity;
+    filterMinRelVol = 1.5;
+    renderTable();
+  }
+
+  /* ════════════════════════════════════════
+     Render (filter → sort → paint)
+  ════════════════════════════════════════ */
   function renderTable() {
-    const sorted = [...rows].sort((a, b) => {
+    /* 1. filter */
+    const filtered = rows.filter(r =>
+      r.close <= filterMaxClose && r.relative_volume >= filterMinRelVol
+    );
+
+    /* 2. sort */
+    const sorted = [...filtered].sort((a, b) => {
       const av = a[sortKey], bv = b[sortKey];
       if (typeof av === 'string') {
-        return sortDir === 'asc' ? av.localeCompare(bv, 'zh-TW') : bv.localeCompare(av, 'zh-TW');
+        return sortDir === 'asc'
+          ? av.localeCompare(bv, 'zh-TW')
+          : bv.localeCompare(av, 'zh-TW');
       }
       return sortDir === 'asc' ? av - bv : bv - av;
     });
 
+    /* 3. count display */
+    const total   = rows.length;
+    const shown   = filtered.length;
+    const diffTxt = shown < total
+      ? `<span class="text-gray-600 ml-2 text-xs">（從 ${total} 筆過濾）</span>`
+      : '';
+    document.getElementById('resultCount').innerHTML =
+      `共 <span class="text-gray-200 font-bold">${shown}</span> 筆符合${diffTxt}`;
+
+    /* 4. filter status badge */
+    const badges = [];
+    if (filterMaxClose  < Infinity) badges.push(`收盤 ≤ $${filterMaxClose}`);
+    if (filterMinRelVol > 1.5)      badges.push(`相對量 ≥ ${filterMinRelVol}×`);
+    document.getElementById('filterStatus').textContent =
+      badges.length ? '過濾中：' + badges.join('、') : '';
+
+    /* 5. paint rows */
     const tbody = document.getElementById('tableBody');
     if (!sorted.length) {
       tbody.innerHTML =
-        '<tr><td colspan="8" class="text-center py-14 text-gray-600">今日無符合條件的股票</td></tr>';
+        '<tr><td colspan="8" class="text-center py-14 text-gray-600">無符合條件的股票</td></tr>';
       return;
     }
 
     tbody.innerHTML = sorted.map(r => `
       <tr class="border-t border-gray-800/60">
-        <td class="px-4 py-2.5 text-gray-500 whitespace-nowrap">${r.date || '—'}</td>
+        <td class="px-4 py-2.5 text-gray-500 whitespace-nowrap text-xs">${r.date || '—'}</td>
         <td class="px-4 py-2.5">
           <a href="https://tw.stock.yahoo.com/quote/${r.symbol}"
              target="_blank" rel="noopener"
@@ -206,23 +302,34 @@
     `).join('');
   }
 
-  /* ── 排序 ── */
+  /* ════════════════════════════════════════
+     Sort (header click)
+  ════════════════════════════════════════ */
   function sortBy(key) {
     sortDir = (sortKey === key && sortDir === 'desc') ? 'asc' : 'desc';
     sortKey = key;
     document.querySelectorAll('thead th').forEach((th, i) => {
-      th.className = th.className.replace(/sort-(asc|desc|none)/g, '');
-      th.classList.add(COLS[i] === key
-        ? (sortDir === 'asc' ? 'sort-asc' : 'sort-desc')
-        : 'sort-none');
+      th.className = th.className.replace(/sort-(asc|desc|none)/g, '').trimEnd();
+      th.classList.add(
+        COLS[i] === key ? (sortDir === 'asc' ? 'sort-asc' : 'sort-desc') : 'sort-none'
+      );
     });
     renderTable();
   }
 
-  /* ── 初始化 ── */
-  document.getElementById('dateSelect').addEventListener('change', e => loadResults(e.target.value));
-  loadDates();
-  loadResults();
+  /* ════════════════════════════════════════
+     Init — load dates first, then stocks
+  ════════════════════════════════════════ */
+  document.getElementById('dateSelect').addEventListener('change', e => {
+    loadResults(e.target.value || undefined);
+  });
+
+  (async () => {
+    await loadDates();
+    // Use the first (latest) date from the selector; falls back to API default if selector empty
+    const firstDate = document.getElementById('dateSelect').value || undefined;
+    await loadResults(firstDate);
+  })();
 </script>
 </body>
 </html>

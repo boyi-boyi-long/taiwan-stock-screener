@@ -56,27 +56,12 @@ def _err(msg: str, status: int = 500) -> JSONResponse:
 
 
 @app.get("/api/stocks")
-async def get_stocks():
-    sb, err = _get_sb()
-    if err:
-        return _err(err)
-    try:
-        result = (
-            sb.table("screening_results")
-            .select("*")
-            .order("date", desc=True)
-            .order("relative_volume", desc=True)
-            .limit(1000)
-            .execute()
-        )
-        return {"count": len(result.data), "results": result.data}
-    except Exception as exc:
-        log.error(f"get_stocks error:\n{traceback.format_exc()}")
-        return _err(str(exc))
-
-
-@app.get("/api/results")
-async def get_results(date: str = None):
+async def get_stocks(date: str = None):
+    """
+    依日期取得篩選結果，依 relative_volume 降序排列。
+    - date 未傳：自動取 Supabase 最新一天的資料。
+    - date 已傳（YYYY-MM-DD）：只回傳該日資料。
+    """
     sb, err = _get_sb()
     if err:
         return _err(err)
@@ -103,12 +88,13 @@ async def get_results(date: str = None):
         )
         return {"date": date, "count": len(result.data), "results": result.data}
     except Exception as exc:
-        log.error(f"get_results error:\n{traceback.format_exc()}")
+        log.error(f"get_stocks error:\n{traceback.format_exc()}")
         return _err(str(exc))
 
 
 @app.get("/api/dates")
 async def get_dates():
+    """回傳最近 30 天有資料的不重複日期清單（降序）。"""
     sb, err = _get_sb()
     if err:
         return _err(err)
@@ -120,7 +106,7 @@ async def get_dates():
             .execute()
         )
         dates = list(dict.fromkeys(r["date"] for r in result.data))
-        return {"dates": dates[:60]}
+        return {"dates": dates[:30]}
     except Exception as exc:
         log.error(f"get_dates error:\n{traceback.format_exc()}")
         return _err(str(exc))
