@@ -8,7 +8,7 @@ import requests
 import pandas as pd
 import yfinance as yf
 from datetime import date, timedelta
-from supabase import create_client
+from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -117,16 +117,17 @@ def screen_batch(tickers: list, stock_names: dict) -> list:
             if atr < threshold:
                 continue
 
+            # 【核心修復點】全面強制轉換為 Python 標準原生型態，防止 Supabase JSON 序列化失敗
             results.append(
                 {
                     "date": date.today().isoformat(),
-                    "symbol": code,
-                    "name": stock_names.get(code, ""),
-                    "close": round(today_close, 2),
+                    "symbol": str(code),
+                    "name": str(stock_names.get(code, "")),
+                    "close": float(round(today_close, 2)),
                     "volume": int(today_volume),
-                    "avg_volume_30d": round(avg_vol_30d, 0),
-                    "relative_volume": round(rel_vol, 4),
-                    "atr_14": round(atr, 4),
+                    "avg_volume_30d": float(round(avg_vol_30d, 0)),
+                    "relative_volume": float(round(rel_vol, 4)),
+                    "atr_14": float(round(atr, 4)),
                 }
             )
         except Exception as e:
@@ -137,14 +138,23 @@ def screen_batch(tickers: list, stock_names: dict) -> list:
 
 
 def save_to_supabase(results: list) -> None:
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_KEY"]
-    sb = create_client(url, key)
     if not results:
         log.info("無符合條件的股票，不寫入資料庫")
         return
-    sb.table("screening_results").insert(results).execute()
-    log.info(f"已寫入 {len(results)} 筆結果至 Supabase")
+
+    url = os.environ["SUPABASE_URL"]
+    key = os.environ["SUPABASE_KEY"]
+
+    # 使用官方強型別初始化
+    sb: Client = create_client(url, key)
+
+    try:
+        # 純 insert 執行
+        sb.table("screening_results").insert(results).execute()
+        log.info(f"已寫入 {len(results)} 筆結果至 Supabase")
+    except Exception as e:
+        log.error(f"寫入 Supabase 失敗: {e}")
+        raise e
 
 
 def run_screening() -> int:
