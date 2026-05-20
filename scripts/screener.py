@@ -169,12 +169,12 @@ def save_to_supabase(results: list) -> None:
     sb: Client = create_client(url, key)
 
     try:
-        # 純 insert 執行
-        sb.table("screening_results").insert(results).execute()
+        # upsert：同一 (date, symbol) 重複執行時覆寫，不觸發 UNIQUE 衝突
+        sb.table("screening_results").upsert(results, on_conflict="date,symbol").execute()
         log.info(f"已寫入 {len(results)} 筆結果至 Supabase")
     except Exception as e:
         log.error(f"寫入 Supabase 失敗: {e}")
-        raise e
+        raise
 
 
 def run_screening() -> int:
@@ -212,5 +212,10 @@ def run_screening() -> int:
 
 
 if __name__ == "__main__":
-    count = run_screening()
-    sys.exit(0)
+    try:
+        count = run_screening()
+        log.info(f"完成，共 {count} 支股票符合條件")
+        sys.exit(0)
+    except Exception as exc:
+        log.error(f"選股腳本發生未預期錯誤: {exc}", exc_info=True)
+        sys.exit(1)
