@@ -2,6 +2,7 @@ import os
 import logging
 import traceback
 
+# Trigger redeploy — 2026-05-20
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -39,20 +40,32 @@ def _get_sb():
     """Return (Client, None) on success, (None, error_str) on failure."""
     url = os.environ.get("SUPABASE_URL", "")
     key = os.environ.get("SUPABASE_KEY", "")
+
+    # Emit presence of each variable (never log actual values)
+    log.info(f"[env] SUPABASE_URL present={bool(url)}  SUPABASE_KEY present={bool(key)}")
+    log.info(f"[env] total env vars visible to process: {len(os.environ)}")
+
     if not url or not key:
         missing = [name for name, val in [("SUPABASE_URL", url), ("SUPABASE_KEY", key)] if not val]
-        msg = f"Missing environment variables: {', '.join(missing)}"
-        log.error(msg)
-        return None, msg
+        log.error(f"[env] missing variables: {missing} — check Vercel project settings")
+        return None, "Backend variables missing. Please check Vercel settings."
+
     try:
-        return create_client(url, key), None
+        log.info(f"[env] connecting to Supabase ({url[:32]}…)")
+        client = create_client(url, key)
+        log.info("[env] Supabase client ready")
+        return client, None
     except Exception as exc:
-        log.error(f"create_client failed: {exc}\n{traceback.format_exc()}")
+        log.error(f"[env] create_client failed: {exc}\n{traceback.format_exc()}")
         return None, str(exc)
 
 
 def _err(msg: str, status: int = 500) -> JSONResponse:
-    return JSONResponse(status_code=status, content={"error": msg})
+    # Return both "status/message" (human-readable) and "error" (legacy frontend compat)
+    return JSONResponse(
+        status_code=status,
+        content={"status": "error", "message": msg, "error": msg},
+    )
 
 
 @app.get("/api/stocks")
