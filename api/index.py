@@ -18,10 +18,12 @@ except Exception:
     pass
 
 # Critical imports — log full traceback before re-raising so Vercel Logs shows the root cause
+from pathlib import Path
+
 try:
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import JSONResponse, HTMLResponse
     from supabase import create_client, Client
 except Exception:
     log.error("FATAL: failed to import required packages\n" + traceback.format_exc())
@@ -29,12 +31,26 @@ except Exception:
 
 app = FastAPI(title="台股選股系統")
 
+# index.html 路徑：api/index.py → parent = api/ → parent = project root
+_HTML_PATH = Path(__file__).parent.parent / "public" / "index.html"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+async def root():
+    """前端入口：直接由 FastAPI 回傳 index.html，避免 Vercel 靜態路由問題。"""
+    try:
+        html = _HTML_PATH.read_text(encoding="utf-8")
+        return HTMLResponse(content=html)
+    except Exception:
+        log.error(f"Cannot read index.html: {_HTML_PATH}\n{traceback.format_exc()}")
+        return HTMLResponse(content="<h1>index.html not found</h1>", status_code=500)
 
 
 def _get_sb():
