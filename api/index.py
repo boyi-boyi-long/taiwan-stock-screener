@@ -44,13 +44,19 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    """前端入口：直接由 FastAPI 回傳 index.html，避免 Vercel 靜態路由問題。"""
+    """前端入口：FastAPI 直接回傳 index.html，no-cache 確保每次都拿最新版。"""
     try:
         html = _HTML_PATH.read_text(encoding="utf-8")
-        return HTMLResponse(content=html)
+        return HTMLResponse(
+            content=html,
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
     except Exception:
-        log.error(f"Cannot read index.html: {_HTML_PATH}\n{traceback.format_exc()}")
-        return HTMLResponse(content="<h1>index.html not found</h1>", status_code=500)
+        log.error(f"Cannot read index.html at {_HTML_PATH}\n{traceback.format_exc()}")
+        return HTMLResponse(
+            content=f"<pre>index.html not found.\nLooked at: {_HTML_PATH}</pre>",
+            status_code=500,
+        )
 
 
 def _get_sb():
