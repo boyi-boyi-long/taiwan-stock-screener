@@ -143,9 +143,7 @@ def save_to_supabase(results: list) -> None:
     if not results:
         log.info("無符合條件的股票，不寫入資料庫")
         return
-    sb.table("screening_results").upsert(
-        results, on_conflict="date,symbol"
-    ).execute()
+    sb.table("screening_results").insert(results).execute()
     log.info(f"已寫入 {len(results)} 筆結果至 Supabase")
 
 
