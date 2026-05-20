@@ -61,6 +61,59 @@
     </div>
   </div>
 
+  <!-- ── Strategy description ── -->
+  <div class="rounded-xl border border-blue-900/50 bg-gradient-to-br from-gray-900 via-gray-900 to-blue-950/30 px-6 py-5 mb-4">
+    <h2 class="text-sm font-bold text-blue-300 mb-4 tracking-wide flex items-center gap-2">
+      📊 策略核心心法與選股邏輯
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+
+      <div class="bg-gray-800/70 border border-emerald-900/40 rounded-lg p-4">
+        <div class="text-xs font-bold text-emerald-400 mb-2 tracking-wide uppercase">
+          1. 流動性濾網
+        </div>
+        <div class="text-xs text-gray-300 leading-relaxed">
+          30日均量
+          <span class="font-mono text-white bg-gray-700/60 rounded px-1">&gt; 100萬股（1000張）</span>
+          <br/><span class="text-gray-500 mt-1 block">
+            確保剔除沒有流動性的殭屍股，資金進出安全。
+          </span>
+        </div>
+      </div>
+
+      <div class="bg-gray-800/70 border border-emerald-900/40 rounded-lg p-4">
+        <div class="text-xs font-bold text-emerald-400 mb-2 tracking-wide uppercase">
+          2. 動能爆發指標
+        </div>
+        <div class="text-xs text-gray-300 leading-relaxed">
+          相對成交量
+          <span class="font-mono text-white bg-gray-700/60 rounded px-1">&gt; 1.5×</span>
+          <br/><span class="text-gray-500 mt-1 block">
+            揪出今日成交量明顯放大、有主力資金實質介入攻擊的強勢標的。
+          </span>
+        </div>
+      </div>
+
+      <div class="bg-gray-800/70 border border-emerald-900/40 rounded-lg p-4">
+        <div class="text-xs font-bold text-emerald-400 mb-2 tracking-wide uppercase">
+          3. 波動度濾網（ATR）
+        </div>
+        <div class="text-xs text-gray-300 leading-relaxed">
+          ATR(14)
+          <span class="font-mono text-white bg-gray-700/60 rounded px-1">&gt; $2.5</span>
+          <span class="text-gray-600 ml-1">（高價股需比例放大）</span>
+          <br/><span class="text-gray-500 mt-1 block">
+            篩選短線具備足夠波動與獲利空間的活躍股票。
+          </span>
+        </div>
+      </div>
+
+    </div>
+    <div class="border-t border-gray-800/80 pt-3 text-xs text-yellow-600/70 leading-relaxed">
+      📌 盤中說明：本系統採方案 B 靜態鎖定，盤中時段一律顯示前一完整交易日之結算名單，避免盤中成交量未累積完全導致訊號失真。
+    </div>
+  </div>
+
   <!-- ── Filter bar ── -->
   <div class="flex flex-wrap items-center gap-x-8 gap-y-3
               bg-gray-900/70 border border-gray-800 rounded-lg px-5 py-3 mb-4">

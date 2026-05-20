@@ -29,6 +29,19 @@ ATR_HIGH_THRESHOLD = 5.0
 HIGH_PRICE_CUTOFF = 200.0
 
 
+def get_last_completed_trading_day() -> date:
+    """
+    方案 B：找出最近一個「已完整收盤」的交易日（週一～五，嚴格排除今日）。
+    不論在盤前、盤中、假日執行，一律鎖定前一個完整交易日，
+    防止盤中資料未累積完全就寫入 Supabase 產生失真訊號。
+    台灣國定假日由 yfinance 自動過濾（假日當天該股票沒有資料列）。
+    """
+    d = date.today() - timedelta(days=1)
+    while d.weekday() >= 5:  # 跳過週六(5)、週日(6)
+        d -= timedelta(days=1)
+    return d
+
+
 def get_twse_stock_list() -> dict:
     """從台灣證交所 OpenAPI 取得上市股票代碼與名稱"""
     url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
@@ -64,9 +77,10 @@ def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
     return float(val) if pd.notna(val) else 0.0
 
 
-def screen_batch(tickers: list, stock_names: dict) -> list:
-    end = date.today() + timedelta(days=1)
-    start = date.today() - timedelta(days=90)  # 約 60 個交易日
+def screen_batch(tickers: list, stock_names: dict, target_date: date) -> list:
+    # 方案 B：只下載到 target_date，確保絕不含盤中未完成數據
+    end = target_date + timedelta(days=1)
+    start = target_date - timedelta(days=90)  # 約 60 個交易日
 
     try:
         data = yf.download(
@@ -96,6 +110,12 @@ def screen_batch(tickers: list, stock_names: dict) -> list:
             if len(df) < 32:
                 continue
 
+            # 方案 B 防呆：確認最後一筆確實是 target_date（台灣國定假日無此列 → 自動跳過）
+            last_idx = df.index[-1]
+            last_date = last_idx.date() if hasattr(last_idx, "date") else last_idx
+            if last_date != target_date:
+                continue
+
             today_close = float(df["Close"].iloc[-1])
             today_volume = float(df["Volume"].iloc[-1])
 
@@ -120,7 +140,7 @@ def screen_batch(tickers: list, stock_names: dict) -> list:
             # 【核心修復點】全面強制轉換為 Python 標準原生型態，防止 Supabase JSON 序列化失敗
             results.append(
                 {
-                    "date": date.today().isoformat(),
+                    "date": target_date.isoformat(),
                     "symbol": str(code),
                     "name": str(stock_names.get(code, "")),
                     "close": float(round(today_close, 2)),
@@ -158,7 +178,8 @@ def save_to_supabase(results: list) -> None:
 
 
 def run_screening() -> int:
-    log.info("開始台股選股...")
+    target_date = get_last_completed_trading_day()
+    log.info(f"開始台股選股... 目標交易日：{target_date}（方案 B 靜態鎖定）")
 
     stock_names = get_twse_stock_list()
     if not stock_names:
@@ -175,7 +196,7 @@ def run_screening() -> int:
         batch = tickers[i : i + BATCH_SIZE]
         batch_num = i // BATCH_SIZE + 1
         log.info(f"處理第 {batch_num}/{total_batches} 批（{len(batch)} 支）...")
-        batch_results = screen_batch(batch, stock_names)
+        batch_results = screen_batch(batch, stock_names, target_date)
         all_results.extend(batch_results)
         log.info(f"  → 本批符合: {len(batch_results)} 支")
 
