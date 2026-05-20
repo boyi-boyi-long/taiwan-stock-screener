@@ -1,6 +1,7 @@
 import os
 import logging
 import traceback
+from datetime import date as _date, timedelta
 
 # Trigger redeploy — 2026-05-20
 logging.basicConfig(
@@ -107,19 +108,21 @@ async def get_stocks(date: str = None):
 
 @app.get("/api/dates")
 async def get_dates():
-    """回傳最近 30 天有資料的不重複日期清單（降序）。"""
+    """回傳過去 30 天內有資料的不重複日期清單（降序）。"""
     sb, err = _get_sb()
     if err:
         return _err(err)
     try:
+        since = (_date.today() - timedelta(days=30)).isoformat()
         result = (
             sb.table("screening_results")
             .select("date")
+            .gte("date", since)
             .order("date", desc=True)
             .execute()
         )
         dates = list(dict.fromkeys(r["date"] for r in result.data))
-        return {"dates": dates[:30]}
+        return {"dates": dates}
     except Exception as exc:
         log.error(f"get_dates error:\n{traceback.format_exc()}")
         return _err(str(exc))

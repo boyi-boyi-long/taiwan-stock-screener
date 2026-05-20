@@ -1,0 +1,34 @@
+name: Backfill Historical Screening Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: '要補幾個交易日（預設 7）'
+        required: false
+        default: '7'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install yfinance pandas numpy supabase requests python-dotenv
+
+      - name: Run backfill
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          BACKFILL_DAYS: ${{ github.event.inputs.days }}
+        run: python scripts/backfill.py
