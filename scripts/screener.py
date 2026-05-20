@@ -124,8 +124,8 @@ def screen_batch(tickers: list, stock_names: dict) -> list:
                     "symbol": str(code),
                     "name": str(stock_names.get(code, "")),
                     "close": float(round(today_close, 2)),
-                    "volume": int(today_volume),
-                    "avg_volume_30d": float(round(avg_vol_30d, 0)),
+                    "volume": int(round(today_volume)),
+                    "avg_volume_30d": int(round(avg_vol_30d)),
                     "relative_volume": float(round(rel_vol, 4)),
                     "atr_14": float(round(atr, 4)),
                 }
