@@ -28,13 +28,13 @@
       <p class="text-gray-500 text-xs mt-1">每日 17:30 自動篩選高相對成交量 + 高波動度股票</p>
     </div>
     <div class="flex items-center gap-3">
-      <label class="text-gray-500 text-sm">日期</label>
+      <label class="text-gray-500 text-sm">日期篩選</label>
       <select id="dateSelect"
         class="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-300
                focus:outline-none focus:border-blue-500 transition-colors">
-        <option value="">載入中...</option>
+        <option value="">全部日期</option>
       </select>
-      <button onclick="loadResults(document.getElementById('dateSelect').value)"
+      <button onclick="reload()"
         class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded transition-colors">
         重新整理
       </button>
@@ -63,7 +63,6 @@
   <!-- Stats bar -->
   <div class="flex items-center gap-6 mb-3 text-sm text-gray-500">
     <span id="resultCount">—</span>
-    <span id="dataDate">—</span>
     <span id="loadStatus" class="text-blue-500"></span>
   </div>
 
@@ -72,8 +71,9 @@
     <table class="w-full text-sm border-collapse">
       <thead>
         <tr class="bg-gray-900 text-gray-400 text-xs uppercase tracking-wider">
-          <th class="text-left px-4 py-3 sort-none" onclick="sortBy('symbol')">代碼</th>
-          <th class="text-left px-4 py-3 sort-none" onclick="sortBy('name')">名稱</th>
+          <th class="text-left px-4 py-3 sort-none"  onclick="sortBy('date')">篩選日期</th>
+          <th class="text-left px-4 py-3 sort-none"  onclick="sortBy('symbol')">代碼</th>
+          <th class="text-left px-4 py-3 sort-none"  onclick="sortBy('name')">名稱</th>
           <th class="text-right px-4 py-3 sort-none" onclick="sortBy('close')">收盤價</th>
           <th class="text-right px-4 py-3 sort-none" onclick="sortBy('volume')">今日成交量</th>
           <th class="text-right px-4 py-3 sort-none" onclick="sortBy('avg_volume_30d')">30日均量</th>
@@ -83,7 +83,7 @@
       </thead>
       <tbody id="tableBody">
         <tr>
-          <td colspan="7" class="text-center py-16 text-gray-600">
+          <td colspan="8" class="text-center py-16 text-gray-600">
             <svg class="spinner inline w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
@@ -102,18 +102,14 @@
 </div>
 
 <script>
-  const COLS = ['symbol','name','close','volume','avg_volume_30d','relative_volume','atr_14'];
+  const COLS = ['date','symbol','name','close','volume','avg_volume_30d','relative_volume','atr_14'];
   let rows = [];
   let sortKey = 'relative_volume';
   let sortDir = 'desc';
 
   /* ── 格式化 ── */
   function fmtVol(n) {
-    n = Number(n);
-    if (n >= 1e8) return (n/1e8).toFixed(1) + '億';
-    if (n >= 1e7) return (n/1e7).toFixed(1) + '千萬';
-    if (n >= 1e6) return (n/1e6).toFixed(1) + '百萬';
-    return n.toLocaleString();
+    return Number(n).toLocaleString('zh-TW');
   }
   function fmtPrice(n) { return '$' + Number(n).toFixed(2); }
   function fmtRelVol(n) {
@@ -124,72 +120,88 @@
     return `<span class="${cls}">${v.toFixed(2)}×</span>`;
   }
 
+  const SPINNER = `
+    <svg class="spinner inline w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+    </svg>`;
+
   /* ── 日期下拉 ── */
   async function loadDates() {
     try {
       const r = await fetch('/api/dates');
       const j = await r.json();
       const sel = document.getElementById('dateSelect');
-      sel.innerHTML = '';
       (j.dates || []).forEach((d, i) => {
         const o = document.createElement('option');
         o.value = d;
         o.textContent = d + (i === 0 ? '（最新）' : '');
         sel.appendChild(o);
       });
-      if (!j.dates?.length) sel.innerHTML = '<option value="">尚無資料</option>';
     } catch {
-      document.getElementById('dateSelect').innerHTML = '<option value="">無法載入</option>';
+      // date filter silently degraded — "全部日期" still works
     }
   }
 
   /* ── 載入結果 ── */
   async function loadResults(date = '') {
     document.getElementById('loadStatus').textContent = '載入中...';
-    const url = date ? `/api/results?date=${encodeURIComponent(date)}` : '/api/results';
+    document.getElementById('tableBody').innerHTML =
+      `<tr><td colspan="8" class="text-center py-16 text-gray-600">${SPINNER}載入中...</td></tr>`;
+
+    const url = date
+      ? `/api/results?date=${encodeURIComponent(date)}`
+      : '/api/stocks';
     try {
       const r = await fetch(url);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       rows = j.results || [];
-      document.getElementById('resultCount').textContent = `共 ${j.count ?? 0} 檔符合`;
-      document.getElementById('dataDate').textContent = j.date ? `資料日期：${j.date}` : '';
+      document.getElementById('resultCount').textContent = `共 ${j.count ?? 0} 筆符合`;
       document.getElementById('loadStatus').textContent = '';
       renderTable();
     } catch (e) {
       document.getElementById('loadStatus').textContent = '載入失敗：' + e.message;
       document.getElementById('tableBody').innerHTML =
-        `<tr><td colspan="7" class="text-center py-12 text-red-500">載入失敗：${e.message}</td></tr>`;
+        `<tr><td colspan="8" class="text-center py-12 text-red-500">載入失敗：${e.message}</td></tr>`;
     }
+  }
+
+  function reload() {
+    loadResults(document.getElementById('dateSelect').value);
   }
 
   /* ── 渲染表格 ── */
   function renderTable() {
     const sorted = [...rows].sort((a, b) => {
       const av = a[sortKey], bv = b[sortKey];
-      if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv, 'zh-TW') : bv.localeCompare(av, 'zh-TW');
+      if (typeof av === 'string') {
+        return sortDir === 'asc' ? av.localeCompare(bv, 'zh-TW') : bv.localeCompare(av, 'zh-TW');
+      }
       return sortDir === 'asc' ? av - bv : bv - av;
     });
 
     const tbody = document.getElementById('tableBody');
     if (!sorted.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-14 text-gray-600">今日無符合條件的股票</td></tr>';
+      tbody.innerHTML =
+        '<tr><td colspan="8" class="text-center py-14 text-gray-600">今日無符合條件的股票</td></tr>';
       return;
     }
 
     tbody.innerHTML = sorted.map(r => `
       <tr class="border-t border-gray-800/60">
+        <td class="px-4 py-2.5 text-gray-500 whitespace-nowrap">${r.date || '—'}</td>
         <td class="px-4 py-2.5">
           <a href="https://tw.stock.yahoo.com/quote/${r.symbol}"
              target="_blank" rel="noopener"
-             class="text-blue-400 hover:text-blue-300 hover:underline">${r.symbol}</a>
+             class="text-blue-400 hover:text-blue-300 hover:underline font-mono">${r.symbol}</a>
         </td>
         <td class="px-4 py-2.5 text-gray-300">${r.name || '—'}</td>
-        <td class="px-4 py-2.5 text-right text-amber-400">${fmtPrice(r.close)}</td>
-        <td class="px-4 py-2.5 text-right text-gray-300">${fmtVol(r.volume)}</td>
-        <td class="px-4 py-2.5 text-right text-gray-500">${fmtVol(r.avg_volume_30d)}</td>
-        <td class="px-4 py-2.5 text-right">${fmtRelVol(r.relative_volume)}</td>
-        <td class="px-4 py-2.5 text-right text-orange-400">$${Number(r.atr_14).toFixed(2)}</td>
+        <td class="px-4 py-2.5 text-right text-amber-400 font-mono">${fmtPrice(r.close)}</td>
+        <td class="px-4 py-2.5 text-right text-gray-300 font-mono">${fmtVol(r.volume)}</td>
+        <td class="px-4 py-2.5 text-right text-gray-500 font-mono">${fmtVol(r.avg_volume_30d)}</td>
+        <td class="px-4 py-2.5 text-right font-mono">${fmtRelVol(r.relative_volume)}</td>
+        <td class="px-4 py-2.5 text-right text-orange-400 font-mono">$${Number(r.atr_14).toFixed(2)}</td>
       </tr>
     `).join('');
   }
@@ -198,10 +210,11 @@
   function sortBy(key) {
     sortDir = (sortKey === key && sortDir === 'desc') ? 'asc' : 'desc';
     sortKey = key;
-
     document.querySelectorAll('thead th').forEach((th, i) => {
       th.className = th.className.replace(/sort-(asc|desc|none)/g, '');
-      th.classList.add(COLS[i] === key ? (sortDir === 'asc' ? 'sort-asc' : 'sort-desc') : 'sort-none');
+      th.classList.add(COLS[i] === key
+        ? (sortDir === 'asc' ? 'sort-asc' : 'sort-desc')
+        : 'sort-none');
     });
     renderTable();
   }
