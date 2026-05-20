@@ -107,6 +107,14 @@ def screen_on_date(target: date, df_full: pd.DataFrame) -> dict | None:
     if atr < (ATR_HIGH if close >= HIGH_PRICE_CUT else ATR_LOW):
         return None
 
+    # 條件四：均線多頭排列 5MA > 10MA > 24MA
+    ma5  = df["Close"].rolling(5).mean().iloc[-1]
+    ma10 = df["Close"].rolling(10).mean().iloc[-1]
+    ma24 = df["Close"].rolling(24).mean().iloc[-1]
+    if not (pd.notna(ma5) and pd.notna(ma10) and pd.notna(ma24)
+            and ma5 > ma10 > ma24):
+        return None
+
     return {
         "close":           float(round(close, 2)),
         "volume":          int(round(volume)),

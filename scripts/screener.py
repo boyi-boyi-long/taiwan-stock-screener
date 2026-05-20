@@ -137,6 +137,14 @@ def screen_batch(tickers: list, stock_names: dict, target_date: date) -> list:
             if atr < threshold:
                 continue
 
+            # 條件四：均線多頭排列 5MA > 10MA > 24MA
+            ma5  = df["Close"].rolling(5).mean().iloc[-1]
+            ma10 = df["Close"].rolling(10).mean().iloc[-1]
+            ma24 = df["Close"].rolling(24).mean().iloc[-1]
+            if not (pd.notna(ma5) and pd.notna(ma10) and pd.notna(ma24)
+                    and ma5 > ma10 > ma24):
+                continue
+
             # 【核心修復點】全面強制轉換為 Python 標準原生型態，防止 Supabase JSON 序列化失敗
             results.append(
                 {
